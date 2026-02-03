@@ -234,17 +234,17 @@ async fn request_shutdown(settings: &Settings) {
 fn spawn_daemon_process() -> Result<()> {
     let exe = std::env::current_exe().wrap_err("could not locate atuin executable")?;
 
-    let mut cmd = Command::new(exe);
-    cmd.arg("daemon")
+    let mut command = Command::new(exe);
+    command.arg("daemon")
         .arg("start")
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
 
     #[cfg(unix)]
-    cmd.arg("--daemonize");
+    command.arg("--daemonize");
 
-    cmd.spawn().wrap_err("failed to spawn daemon process")?;
+    command.spawn().wrap_err("failed to spawn daemon process")?;
 
     Ok(())
 }
