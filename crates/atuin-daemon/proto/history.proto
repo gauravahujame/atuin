@@ -44,9 +44,23 @@ message ShutdownReply {
   bool accepted = 1;
 }
 
+message HealthCheckRequest {}
+
+message HealthCheckReply {
+  bool healthy = 1;
+  string version = 2;
+  uint64 uptime_seconds = 3;
+  uint32 running_commands = 4;
+}
+
 service History {
   rpc StartHistory(StartHistoryRequest) returns (StartHistoryReply);
   rpc EndHistory(EndHistoryRequest) returns (EndHistoryReply);
   rpc Status(StatusRequest) returns (StatusReply);
   rpc Shutdown(ShutdownRequest) returns (ShutdownReply);
 }
+
+service Health {
+  rpc Check(HealthCheckRequest) returns (HealthCheckReply);
+}
+

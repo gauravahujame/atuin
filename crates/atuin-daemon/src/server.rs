@@ -19,8 +19,12 @@ use eyre::Result;
 use tonic::{Request, Response, Status, transport::Server};
 
 use crate::history::history_server::{History as HistorySvc, HistoryServer};
+use crate::history::health_server::{Health as HealthSvc, HealthServer};
 
-use crate::history::{EndHistoryReply, EndHistoryRequest, StartHistoryReply, StartHistoryRequest};
+use crate::history::{
+    EndHistoryReply, EndHistoryRequest, HealthCheckReply, HealthCheckRequest, StartHistoryReply,
+    StartHistoryRequest,
+};
 use crate::history::{ShutdownReply, ShutdownRequest, StatusReply, StatusRequest};
 
 mod sync;
@@ -49,6 +53,11 @@ impl HistoryService {
             history_db,
             shutdown_tx,
         }
+    }
+
+    /// Get a clone of the running commands map for sharing with other services
+    pub fn running_ref(&self) -> Arc<DashMap<HistoryId, History>> {
+        self.running.clone()
     }
 }
 
@@ -175,30 +184,83 @@ impl HistorySvc for HistoryService {
     }
 }
 
+/// Health check service for daemon diagnostics
+pub struct HealthService {
+    startup_time: OffsetDateTime,
+    running: Arc<DashMap<HistoryId, History>>,
+}
+
+impl HealthService {
+    pub fn new(running: Arc<DashMap<HistoryId, History>>) -> Self {
+        Self {
+            startup_time: OffsetDateTime::now_utc(),
+            running,
+        }
+    }
+}
+
+#[tonic::async_trait()]
+impl HealthSvc for HealthService {
+    async fn check(
+        &self,
+        _request: Request<HealthCheckRequest>,
+    ) -> Result<Response<HealthCheckReply>, Status> {
+        let uptime = (OffsetDateTime::now_utc() - self.startup_time).whole_seconds();
+        let running_commands = self.running.len() as u32;
+
+        let reply = HealthCheckReply {
+            healthy: true,
+            version: env!("CARGO_PKG_VERSION").to_string(),
+            uptime_seconds: uptime.max(0) as u64,
+            running_commands,
+        };
+
+        tracing::debug!(
+            uptime_seconds = reply.uptime_seconds,
+            running_commands = reply.running_commands,
+            "health check"
+        );
+
+        Ok(Response::new(reply))
+    }
+}
+
 #[cfg(unix)]
 async fn shutdown_signal(socket: Option<PathBuf>, mut shutdown_rx: watch::Receiver<bool>) {
-    let mut term = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+    use tokio::signal::unix::SignalKind;
+
+    let mut term = tokio::signal::unix::signal(SignalKind::terminate())
         .expect("failed to register sigterm handler");
-    let mut int = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())
+    let mut int = tokio::signal::unix::signal(SignalKind::interrupt())
         .expect("failed to register sigint handler");
+    let mut hup = tokio::signal::unix::signal(SignalKind::hangup())
+        .expect("failed to register sighup handler");
+    let mut quit = tokio::signal::unix::signal(SignalKind::quit())
+        .expect("failed to register sigquit handler");
 
-    tokio::select! {
-        _  = term.recv() => {},
-        _  = int.recv() => {},
-        _  = shutdown_rx.changed() => {},
-    }
+    let signal_name = tokio::select! {
+        _ = term.recv() => "SIGTERM",
+        _ = int.recv() => "SIGINT",
+        _ = hup.recv() => "SIGHUP",
+        _ = quit.recv() => "SIGQUIT",
+        _ = shutdown_rx.changed() => "SHUTDOWN_RPC",
+    };
 
-    eprintln!("Removing socket...");
+    tracing::info!("received {}, initiating shutdown", signal_name);
+    eprintln!("Received {}, shutting down...", signal_name);
+
     if let Some(socket) = socket {
-        match std::fs::remove_file(socket) {
+        tracing::info!("removing socket file: {:?}", socket);
+        match std::fs::remove_file(&socket) {
             Ok(()) => {}
             Err(err) if err.kind() == ErrorKind::NotFound => {}
             Err(err) => {
+                tracing::warn!("failed to remove socket file {:?}: {}", socket, err);
                 eprintln!("failed to remove socket: {err}");
             }
         }
     }
-    eprintln!("Shutting down...");
+    tracing::info!("shutdown complete");
 }
 
 #[cfg(windows)]
@@ -211,10 +273,56 @@ async fn shutdown_signal(mut shutdown_rx: watch::Receiver<bool>) {
     eprintln!("Shutting down...");
 }
 
+/// Clean up stale socket file if it exists but no daemon is listening.
+/// Returns Ok(()) if the socket was cleaned up or doesn't exist.
+/// Returns Err if another daemon is already running.
+#[cfg(unix)]
+async fn cleanup_stale_socket(socket_path: &str) -> Result<()> {
+    use std::path::Path;
+    use tokio::net::UnixStream;
+
+    let path = Path::new(socket_path);
+
+    // If socket file doesn't exist, nothing to clean up
+    if !path.exists() {
+        return Ok(());
+    }
+
+    tracing::info!("socket file exists at {socket_path:?}, checking if daemon is running");
+
+    // Try to connect to the existing socket to see if a daemon is running
+    match UnixStream::connect(socket_path).await {
+        Ok(_) => {
+            // Connection succeeded - another daemon is running
+            tracing::error!("another daemon is already running at {socket_path:?}");
+            eyre::bail!(
+                "another atuin daemon is already running at {}. \
+                 If you believe this is incorrect, delete the socket file and try again.",
+                socket_path
+            );
+        }
+        Err(e) => {
+            // Connection failed - socket is stale
+            tracing::info!(
+                "socket file exists but connection failed ({}), removing stale socket",
+                e
+            );
+            if let Err(remove_err) = std::fs::remove_file(path) {
+                tracing::warn!(
+                    "failed to remove stale socket file: {}. Attempting to continue anyway.",
+                    remove_err
+                );
+            }
+            Ok(())
+        }
+    }
+}
+
 #[cfg(unix)]
 async fn start_server(
     settings: Settings,
     history: HistoryService,
+    health: HealthService,
     shutdown_rx: watch::Receiver<bool>,
 ) -> Result<()> {
     use tokio::net::UnixListener;
@@ -259,6 +367,9 @@ async fn start_server(
         #[cfg(not(target_os = "linux"))]
         unreachable!()
     } else {
+        // Clean up any stale socket file before binding
+        cleanup_stale_socket(&socket_path).await?;
+
         tracing::info!("listening on unix socket {socket_path:?}");
         (UnixListener::bind(socket_path.clone())?, true)
     };
@@ -267,6 +378,7 @@ async fn start_server(
 
     Server::builder()
         .add_service(HistoryServer::new(history))
+        .add_service(HealthServer::new(health))
         .serve_with_incoming_shutdown(
             uds_stream,
             shutdown_signal(cleanup.then_some(socket_path.into()), shutdown_rx),
@@ -280,6 +392,7 @@ async fn start_server(
 async fn start_server(
     settings: Settings,
     history: HistoryService,
+    health: HealthService,
     shutdown_rx: watch::Receiver<bool>,
 ) -> Result<()> {
     use tokio::net::TcpListener;
@@ -294,6 +407,7 @@ async fn start_server(
 
     Server::builder()
         .add_service(HistoryServer::new(history))
+        .add_service(HealthServer::new(health))
         .serve_with_incoming_shutdown(tcp_stream, shutdown_signal(shutdown_rx))
         .await?;
     Ok(())
@@ -317,6 +431,7 @@ pub async fn listen(
 
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
     let history = HistoryService::new(history_store.clone(), history_db.clone(), shutdown_tx);
+    let health = HealthService::new(history.running_ref());
 
     // start services
     tokio::spawn(sync::worker(
@@ -326,5 +441,5 @@ pub async fn listen(
         history_db,
     ));
 
-    start_server(settings, history, shutdown_rx).await
+    start_server(settings, history, health, shutdown_rx).await
 }

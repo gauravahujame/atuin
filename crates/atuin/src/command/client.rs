@@ -89,7 +89,7 @@ pub enum Cmd {
 
     /// *Experimental* Manage the background daemon
     #[cfg(feature = "daemon")]
-    #[command()]
+    #[command(subcommand)]
     Daemon(daemon::Cmd),
 
     /// Print the default atuin configuration (config.toml)
