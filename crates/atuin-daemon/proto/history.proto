@@ -25,7 +25,21 @@ message EndHistoryReply {
   uint64 idx = 2;
 }
 
+message HealthCheckRequest {}
+
+message HealthCheckReply {
+  bool healthy = 1;
+  string version = 2;
+  uint64 uptime_seconds = 3;
+  uint32 running_commands = 4;
+}
+
 service History {
   rpc StartHistory(StartHistoryRequest) returns (StartHistoryReply);
   rpc EndHistory(EndHistoryRequest) returns (EndHistoryReply);
 }
+
+service Health {
+  rpc Check(HealthCheckRequest) returns (HealthCheckReply);
+}
+

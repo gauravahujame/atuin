@@ -729,6 +729,68 @@ The port to use for client -> daemon communication. Only used on non-unix system
 tcp_port = 8889
 ```
 
+### Troubleshooting the Daemon
+
+**Check daemon status:**
+
+Use the `atuin daemon check` command to see if the daemon is running and get diagnostic information:
+
+```bash
+atuin daemon check
+```
+
+This will show the daemon status, version, uptime, and the number of currently running commands.
+
+**"Address already in use" error:**
+
+This error occurs when a stale socket file exists from a previous daemon that crashed or was killed forcefully.
+
+```
+Error: Address already in use (os error 48)
+```
+
+**Solution:** The daemon should now automatically clean up stale sockets on startup. If you still encounter this issue:
+
+```bash
+# Check the socket status
+atuin daemon check
+
+# If it shows "stale socket", start the daemon which will clean it up
+atuin daemon start
+
+# Or manually remove the stale socket
+rm ~/.local/share/atuin/atuin.sock
+```
+
+**"Connection refused" error:**
+
+This error occurs when the daemon is not running but your shell is configured to use it.
+
+```
+Error: failed to connect to local atuin daemon
+```
+
+**Solution:**
+
+```bash
+# Start the daemon
+atuin daemon start
+
+# Or run it in the background
+atuin daemon start &
+```
+
+**Daemon commands:**
+
+```bash
+# Start the daemon (default)
+atuin daemon start
+
+# Check daemon status
+atuin daemon check
+```
+
+
 ## theme
 
 Atuin version: >= 18.4

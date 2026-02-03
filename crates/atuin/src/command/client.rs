@@ -89,8 +89,8 @@ pub enum Cmd {
 
     /// *Experimental* Start the background daemon
     #[cfg(feature = "daemon")]
-    #[command()]
-    Daemon,
+    #[command(subcommand)]
+    Daemon(daemon::Cmd),
 
     /// Print the default atuin configuration (config.toml)
     #[command()]
@@ -179,7 +179,7 @@ impl Cmd {
             Self::Wrapped { year } => wrapped::run(year, &db, &settings, sqlite_store, theme).await,
 
             #[cfg(feature = "daemon")]
-            Self::Daemon => daemon::run(settings, sqlite_store, db).await,
+            Self::Daemon(cmd) => cmd.run(settings, sqlite_store, db).await,
 
             Self::History(_) | Self::Init(_) | Self::Doctor => unreachable!(),
         }
