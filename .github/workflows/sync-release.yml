@@ -7,7 +7,7 @@ on:
 jobs:
   sync-to-gitea:
     runs-on: ubuntu-latest
-    if: contains(github.ref_name, '-gaurav')
+    if: contains(github.ref_name, '-patch')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -30,15 +30,14 @@ jobs:
           TAG_NAME: ${{ github.ref_name }}
         run: |
           # Get release notes safely
-          RELEASE_BODY=$(gh api repos/${{ github.repository }}/releases/tags/${TAG_NAME} --jq '.body' || echo "Socket cleanup fixes for daemon stability.")
+          RELEASE_BODY=$(gh api repos/${{ github.repository }}/releases/tags/${TAG_NAME} --jq '.body' || echo "Release $TAG_NAME")
 
           curl --fail -X POST \
             "https://gitea.gauravahuja.dev/api/v1/repos/gauravahujame/atuin/releases" \
             -H "Authorization: token $GITEA_TOKEN" \
             -H "Content-Type: application/json" \
             -d "{
-              \"tag_name\": \"$TAG_NAME\",
-              \"name\": \"Atuin $TAG_NAME (Socket Fix)\",
+              \"name\": \"Atuin $TAG_NAME\",
               \"body\": $(echo "$RELEASE_BODY" | jq -Rs .),
               \"draft\": false,
               \"prerelease\": ${{ github.event.release.prerelease }}
@@ -47,7 +46,7 @@ jobs:
   update-homebrew-tap:
     runs-on: ubuntu-latest
     needs: sync-to-gitea
-    if: contains(github.ref_name, '-gaurav')
+    if: contains(github.ref_name, '-patch')
     steps:
       - name: Checkout homebrew-tap repository
         uses: actions/checkout@v4
@@ -71,8 +70,9 @@ jobs:
           SHA256=$(shasum -a 256 /tmp/atuin-source.tar.gz | awk '{print $1}')
           echo "Calculated SHA256: $SHA256"
 
-          # Extract version without 'v' prefix and '-gaurav' suffix
+          # Extract version without 'v' prefix and '-patch' suffix
           VERSION="${TAG_NAME#v}"  # Remove 'v' prefix
+          VERSION="${VERSION%-patch}"  # Remove '-patch' suffix
 
           # Update formula
           # If the formula uses 'version "..."', we update that (dynamic URL).
