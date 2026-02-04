@@ -1,6 +1,6 @@
 # daemon
 
-## `atuin daemon`
+## `atuin daemon start`
 _This is experimental!_
 
 The Atuin daemon is a background daemon designed to
@@ -22,7 +22,7 @@ Add the following to the bottom of your Atuin config file
 enabled = true
 ```
 
-Then, run `atuin daemon`. This might make sense in a tmux session, systemd unit, etc. Once it's ready for wider use, we will handle this setup for you.
+Then, run `atuin daemon start`. This might make sense in a tmux session, systemd unit, etc. Once it's ready for wider use, we will handle this setup for you.
 
 ## Extra config
 
