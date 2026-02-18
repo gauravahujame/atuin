@@ -484,6 +484,21 @@ with motion sensitivity can find the live-updating timestamps distracting.
 
 Alternatively, set env var NO_MOTION
 
+## search
+
+### `filters`
+
+Atuin version: >= 18.4
+
+The list of filter modes available in interactive search, in the order they cycle through when you press ctrl-r. By default, all modes are enabled. Removing a mode from this list disables it entirely. The `workspace` mode is skipped when not in a git repository or when `workspaces = false`. See [`filter_mode`](#filter_mode) for a description of each mode.
+
+The `filter_mode` setting selects the initial mode from this list. If `filter_mode` is set to a mode not in the list, the first available mode is used instead.
+
+```toml
+[search]
+filters = ["global", "host", "session", "directory"]
+```
+
 ## Stats
 
 This section of client config is specifically for configuring Atuin stats calculations
