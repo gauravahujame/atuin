@@ -126,5 +126,40 @@ If you find any security issues, we'd appreciate it if you could alert <ellie@at
 
 Made with [contrib.rocks](https://contrib.rocks).
 
+
+# Maintenance & Release
+
+This repository is a fork of Atuin with custom patches (including socket cleanup). It is maintained by syncing periodic updates from the upstream repository.
+
+## Syncing with Upstream
+
+To sync the `main` and `release` branches with the latest upstream changes:
+
+1. Ensure remotes are set up:
+   ```bash
+   git remote add upstream https://github.com/atuinsh/atuin.git
+   ```
+2. Run the release script (see below).
+
+## Performing a Release
+
+A release involves rebasing custom patches onto the latest upstream `main`, tagging, and pushing. This triggers automated builds and updates the Homebrew tap.
+
+```bash
+# Automatically detect version from Cargo.toml and add -patch suffix
+./release.sh auto
+
+# Or specify a version manually
+./release.sh v18.12.1
+```
+
+The script will:
+- Update `Cargo.toml` version with `-patch` suffix.
+- Sync with upstream `main`.
+- Rebase the current branch onto upstream.
+- Create and push a tag to `origin`.
+
+Once the tag is pushed, the GitHub Actions will take over to build the release and update the Homebrew formula.
+
 [English]: ./README.md
 [简体中文]: ./docs-i18n/zh-CN/README.md
