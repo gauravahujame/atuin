@@ -19,20 +19,9 @@ use daemonize::Daemonize;
 use eyre::{Result, WrapErr, bail, eyre};
 use fs4::fs_std::FileExt;
 use tokio::time::sleep;
-
-#[derive(clap::Args, Debug)]
-pub struct Cmd {
-    /// Internal flag for daemonization
-    #[arg(long, hide = true)]
-    daemonize: bool,
-
-    #[command(subcommand)]
-    subcmd: Option<SubCmd>,
-}
-
 #[derive(Subcommand, Debug)]
 #[command(infer_subcommands = true)]
-pub enum SubCmd {
+pub enum Cmd {
     /// Start the daemon server
     Start {
         #[arg(long, hide = true)]
@@ -54,9 +43,8 @@ impl Cmd {
     /// async runtime or opening any database connections.
     #[cfg(unix)]
     pub fn should_daemonize(&self) -> bool {
-        match &self.subcmd {
-            Some(SubCmd::Start { daemonize }) => *daemonize,
-            None => self.daemonize,
+        match self {
+            Self::Start { daemonize } => *daemonize,
             _ => false,
         }
     }
@@ -67,15 +55,11 @@ impl Cmd {
         store: SqliteStore,
         history_db: Sqlite,
     ) -> Result<()> {
-        match self.subcmd {
-            None => {
-                eprintln!("Warning: `atuin daemon` is deprecated, use `atuin daemon start`");
-                run(settings, store, history_db).await
-            }
-            Some(SubCmd::Start { .. }) => run(settings, store, history_db).await,
-            Some(SubCmd::Status) => status_cmd(&settings).await,
-            Some(SubCmd::Stop) => stop_cmd(&settings).await,
-            Some(SubCmd::Restart) => restart_cmd(&settings).await,
+        match self {
+            Self::Start { .. } => run(settings, store, history_db).await,
+            Self::Status => status_cmd(&settings).await,
+            Self::Stop => stop_cmd(&settings).await,
+            Self::Restart => restart_cmd(&settings).await,
         }
     }
 }
