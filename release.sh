@@ -52,6 +52,10 @@ else
     echo "Using version: $VERSION"
 fi
 
+echo "Committing version change..."
+git add Cargo.toml
+git commit -m "chore(release): update version to $NEW_VERSION"
+
 echo "Syncing with upstream..."
 git fetch upstream
 git rebase upstream/main
