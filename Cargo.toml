@@ -5,7 +5,7 @@ resolver = "2"
 exclude = ["ui/backend"]
 
 [workspace.package]
-version = "18.13.0-beta.1-patch"
+version = "18.13.0-beta.2-patch"
 authors = ["Ellie Huxtable <ellie@atuin.sh>"]
 rust-version = "1.93.1"
 license = "MIT"
@@ -50,16 +50,16 @@ minijinja = "2.9.0"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 
 [workspace.dependencies.tracing-subscriber]
-version = "18.13.0-beta.1-patch"
+version = "18.13.0-beta.2-patch"
 features = ["ansi", "fmt", "registry", "env-filter"]
 
 [workspace.dependencies.reqwest]
-version = "18.13.0-beta.1-patch"
+version = "18.13.0-beta.2-patch"
 features = ["json", "rustls-no-provider"]
 default-features = false
 
 [workspace.dependencies.sqlx]
-version = "18.13.0-beta.1-patch"
+version = "18.13.0-beta.2-patch"
 features = ["runtime-tokio-rustls", "time", "postgres", "uuid"]
 
 # The profile that 'cargo dist' will build with
