@@ -56,9 +56,6 @@ echo "Committing version change..."
 git add Cargo.toml
 git commit -m "chore(release): update version to $NEW_VERSION"
 
-echo "Syncing with upstream..."
-git fetch upstream
-git rebase upstream/main
 
 # Check if tag exists
 if git rev-parse "$VERSION" >/dev/null 2>&1; then
@@ -76,8 +73,9 @@ fi
 
 echo "Pushing changes and tag $VERSION to origin and gitea..."
 for remote in origin gitea; do
-    git push $remote release --force
-    git push $remote "$VERSION" --force --tags
+    echo "Pushing to $remote..."
+    git push $remote release --force || echo "Warning: failed to push to $remote (might be a read-only mirror)"
+    git push $remote "$VERSION" --force --tags || echo "Warning: failed to push tags to $remote"
 done
 
 echo ""
