@@ -83,6 +83,7 @@ nav:
       - search: reference/search.md
       - stats: reference/stats.md
       - sync: reference/sync.md
+      - maintenance: reference/maintenance.md
   - Self Hosting:
       - Server Setup: self-hosting/server-setup.md
       - Usage: self-hosting/usage.md
