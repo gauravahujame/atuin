@@ -16,14 +16,12 @@ if [ "$BRANCH" != "release" ]; then
     echo "Current branch: $BRANCH"
     exit 1
 fi
-
 # Detect OS for sed -i compatibility
 if [[ "$OSTYPE" == "darwin"* ]]; then
     SED_INPLACE=(sed -i '')
 else
     SED_INPLACE=(sed -i)
 fi
-
 # Auto-detect version if requested
 if [ "$VERSION" == "auto" ]; then
     # Extract version from Cargo.toml
@@ -31,8 +29,8 @@ if [ "$VERSION" == "auto" ]; then
     # Remove any existing -patch suffix before adding it back
     BASE_VERSION="${BASE_VERSION%-patch}"
     NEW_VERSION="${BASE_VERSION}-patch"
-    # Update Cargo.toml with the new version
-    "${SED_INPLACE[@]}" "s/^version = \".*\"/version = \"$NEW_VERSION\"/" Cargo.toml
+    # Update Cargo.toml (only the first match under [workspace.package])
+    awk -v v="$NEW_VERSION" '/^version = / && !x {print "version = \""v"\""; x=1; next} 1' Cargo.toml > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
     VERSION="v${NEW_VERSION}"
     echo "Updated Cargo.toml version to: $NEW_VERSION"
     echo "Detected version: $VERSION"
@@ -45,8 +43,8 @@ else
     fi
     BASE_VERSION="${BASE_VERSION%-patch}"
     NEW_VERSION="${BASE_VERSION}-patch"
-    # Update Cargo.toml
-    "${SED_INPLACE[@]}" "s/^version = \".*\"/version = \"$NEW_VERSION\"/" Cargo.toml
+    # Update Cargo.toml (only the first match)
+    awk -v v="$NEW_VERSION" '/^version = / && !x {print "version = \""v"\""; x=1; next} 1' Cargo.toml > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
     VERSION="v${NEW_VERSION}"
     echo "Updated Cargo.toml version to: $NEW_VERSION"
     echo "Using version: $VERSION"

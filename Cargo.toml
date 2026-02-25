@@ -50,16 +50,16 @@ minijinja = "2.9.0"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 
 [workspace.dependencies.tracing-subscriber]
-version = "18.13.0-beta.3-patch"
+version = "0.3"
 features = ["ansi", "fmt", "registry", "env-filter"]
 
 [workspace.dependencies.reqwest]
-version = "18.13.0-beta.3-patch"
+version = "0.13"
 features = ["json", "rustls-no-provider"]
 default-features = false
 
 [workspace.dependencies.sqlx]
-version = "18.13.0-beta.3-patch"
+version = "0.8"
 features = ["runtime-tokio-rustls", "time", "postgres", "uuid"]
 
 # The profile that 'cargo dist' will build with
